@@ -1,0 +1,52 @@
+name: $(BuildDefinitionName)_$(Date:yyyyMMdd)$(Rev:.rr)
+resources:
+  repositories:
+  - repository: tox
+    type: github
+    endpoint: toxdevorg
+    name: tox-dev/azure-pipelines-template
+    ref: master
+
+trigger:
+  batch: true
+  branches:
+    include:
+    - master
+    - refs/tags/*
+pr:
+  branches:
+    include:
+    - master
+
+variables:
+  PYTEST_ADDOPTS: "-v -v -ra --showlocals"
+
+jobs:
+- template: run-tox-env.yml@tox
+  parameters:
+    jobs:
+      fix_lint: null
+      package_readme: null
+      dev: null
+      py37:
+        image: [linux, windows, macOs]
+      py36:
+        image: [linux, windows, macOs]
+      py35:
+        image: [linux, windows, macOs]
+    env:
+    - key: [py35, py36, py37]
+      coverage: 'coverage'
+
+- template: merge-coverage.yml@tox
+  parameters:
+    dependsOn: [py35, py36, py37]
+
+- ${{ if startsWith(variables['Build.SourceBranch'], 'refs/tags/') }}:
+  - template: publish-pypi.yml@tox
+    parameters:
+    - external_feed: 'toxdev'
+    - pypi_remote: 'pypi-toxdev'
+    - dependsOn:
+      - check
+      - report_coverage
